@@ -38,6 +38,13 @@ export default function Home() {
       console.log(username, room);
     }
   }
+
+  const handleLeaveRoom = () => {
+    socket.emit("leave-room", { username, room });
+    setJoined(false);
+    setMessages([]);
+    setRoom("");
+  };
   return (
     <div className="flex justify-center mt-24 w-full">
       {!joined ? (
@@ -49,7 +56,7 @@ export default function Home() {
         </div>
 ) : (
         <div className="w-full max-w-3xl mx-auto">
-          <h1 className="mb-4 text-2xl font-bold">Room: 1</h1>
+          <h1 className="mb-4 text-2xl font-bold">Room: {room}</h1>
           <div className="h-[500px] overflow-y-auto p-4 mb-4 bg-gray-200 border border-gray-300 rounded-md">
             {messages.map((msg, index) => (
               <ChatMessage
@@ -61,7 +68,10 @@ export default function Home() {
             ))}
           </div>
           <Chatform onSendMessage={handleSendMessage} />
+
+          <button onClick={handleLeaveRoom} className="px-4 py-2 text-white bg-blue-500 rounded-lg">Leave the room</button>
         </div>
+        
       )}
     </div>
   );

@@ -15,7 +15,7 @@ io.on("connection", (socket) => {
     console.log("Joining room", room, username);
     socket.join(room);
 
-    socket.to(room).emit("message", {
+    io.to(room).emit("message", {
       sender: "System",
       message: `${username} has joined the room`,
     });
@@ -24,7 +24,17 @@ io.on("connection", (socket) => {
   socket.on("sendMessage", ({ message, username, room }) => {
     io.to(room).emit("message", { sender: username, message });
   });
+
+  socket.on("leave-room", ({username, room}) => {
+    socket.leave(room);
+    io.to(room).emit("message", {
+      sender: "System", 
+      message: `${username} has left the room`
+    })
+  })
 });
+
+
 
 httpServer.listen(5000, () => {
   console.log("Server listening on port 5000");

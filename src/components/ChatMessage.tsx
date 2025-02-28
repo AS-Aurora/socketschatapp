@@ -6,7 +6,7 @@ interface ChatMessageProps {
     isOwnMessage: boolean
     }
 
-const ChatMessage = ({sender, message, isOwnMessage}: ChatMessageProps) => {
+const ChatMessage = ({sender, message, isOwnMessage = false}: ChatMessageProps) => {
     const isSystemMessage = sender === "System"
 
   return (
