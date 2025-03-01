@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Chatform from "../components/Chatform"; 
 import ChatMessage from "../components/ChatMessage";
 import io from "socket.io-client";
+import Logout from "../components/Logout";
 
 const socket = io("http://localhost:5000");
 
@@ -46,9 +47,13 @@ export default function Home() {
     setRoom("");
   };
   return (
-    <div className="flex justify-center mt-24 w-full">
+    <div className="flex justify-center mt-5 mr-2 w-full">
       {!joined ? (
+
+        
         <div className=" flex w-full max-w-3xl mx-auto flex-col items-center">
+
+          <nav><Logout /></nav>
           <h1 className="mb-4 text-2xl font-bold">Join a room</h1>
           <input type="text" placeholder="Enter your username" value={username} onChange={(e) => setUsername(e.target.value)} className="w-64 px-4 py-2 mb-4 border-2 rounded-lg" />
           <input type="text" placeholder="Enter room name" value={room} onChange={(e) => setRoom(e.target.value)} className="w-64 px-4 py-2 mb-4 border-2 rounded-lg"/>
