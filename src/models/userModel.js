@@ -1,25 +1,21 @@
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema({
-    username: {
-        type: String,
-        required: true,
-    },
-    phonenumber: {
+    email: {
         type: String, 
         required: true,
         unique: true
     }, 
     otp: {
         type: String,
-        required: true
+        required: false
     }, 
     otpExpires: {
         type: Date,
-        required: true
+        required: false
     }
 })
 
-const User = mongoose.model.users || mongoose.model('users', userSchema)
+const User = mongoose.models.users || mongoose.model('users', userSchema)
 
 export default User
