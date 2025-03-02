@@ -5,13 +5,13 @@ const messageSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    senderId: {
-        type: mongoose.Schema.Types.ObjectId,
+    sender: {
+        type: String,
         ref: "User"
     },
-    receiverId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
+    room: {
+        type: String,
+        required: true
     },
     timestamp: {
         type: Date,
@@ -28,6 +28,6 @@ const messageSchema = new mongoose.Schema({
     }
 })
 
-const Message = mongoose.model.messages || mongoose.model('messages', messageSchema)
+const Messages = mongoose.models.messages || mongoose.model('messages', messageSchema)
 
-export default Message
+export default Messages
