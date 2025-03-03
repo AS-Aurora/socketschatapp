@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            message: "OTP verified successfully!"
+            message: "OTP verified successfully!",
+            token: token
         });
         
     } catch (error: any) {

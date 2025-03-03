@@ -30,6 +30,7 @@ const VerifyOTPPage = () => {
         if (response.data.success) {
           localStorage.removeItem("email");
           router.push("/");
+          localStorage.setItem("token", response.data.token);
         }
       } catch (error: any) {
         console.error("Error verifying OTP:", error.message);

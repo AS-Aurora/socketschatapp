@@ -25,8 +25,29 @@ const io = new Server(httpServer, {
   },
 });
 
+io.use((socket, next) => {
+  console.log("Authenticating socket connection...");
+  const token = socket.handshake.auth.token;
+  
+  if (!token) {
+    console.log("No token provided");
+    return next(new Error("Authentication error: No token provided"));
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.TOKEN_SECRET);
+    console.log("Authentication successful for user:", decoded.email);
+    socket.decoded = decoded;
+    next();
+  } catch (error) {
+    console.log("Token verification failed:", error.message);
+    next(new Error("Authentication error: Invalid token"));
+  }
+});
+
 io.on("connection", (socket) => {
-  console.log("New connection", socket.id);
+  console.log("New authenticated connection", socket.id);
+  console.log("User data:", socket.decoded);
 
   socket.on("join-room", async ({ username, room }) => {
     console.log("Joining room", room, username);
@@ -35,15 +56,15 @@ io.on("connection", (socket) => {
     io.to(room).emit("message", {
       sender: "System",
       message: `${username} has joined the room`,
+      timestamp: new Date()
     });
 
     try {
       const previousMessages = await Messages.find({ room })
-        .sort({ timestamp: 1 })
+        .sort({ timestamp: 1 });
 
       if (previousMessages.length > 0) {
         console.log(`Sending ${previousMessages.length} previous messages to ${username}`);
-        
         socket.emit("previousMessages", previousMessages);
       }
     } catch (error) {
@@ -69,7 +90,7 @@ io.on("connection", (socket) => {
         sender: username,
         message,
         id: newMessage._id,
-        timeStamp: newMessage.timeStamp,
+        timestamp: newMessage.timestamp,
       });
     } catch (error) {
       console.error("Error saving message:", error.message);
@@ -77,26 +98,17 @@ io.on("connection", (socket) => {
     }
   });
 
-  io.use((socket, next) => {
-    const token = socket.handshake.auth.token
-    if(!token)
-      return next(new Error("Authentication error"))
-
-    try {
-      const decoded = jwt.verify(token, process.env.TOKEN_SECRET)
-      socket.decoded = decoded
-      next()
-    } catch (error) {
-      next(new Error("Authentication error"))
-    }
-  })
-
   socket.on("leave-room", ({ username, room }) => {
     socket.leave(room);
     io.to(room).emit("message", {
       sender: "System",
       message: `${username} has left the room`,
+      timestamp: new Date()
     });
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected:", socket.id);
   });
 });
 

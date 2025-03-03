@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Chatform from "../components/Chatform";
 import ChatMessage from "../components/ChatMessage";
-import io from "socket.io-client";
+import io, { Socket } from "socket.io-client";
 import Logout from "../components/Logout";
-
-const socket = io("http://localhost:5001");
 
 export default function Home() {
   const [room, setRoom] = useState("");
@@ -15,55 +13,82 @@ export default function Home() {
     { sender: string; message: string; id?: string; timestamp: Date }[]
   >([]);
   const [username, setUsername] = useState("");
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
-    const token = document.cookie.split('; ').find((row) => row.startsWith('token='))?.split('=')[1]
+    const token = localStorage.getItem("token")
 
-    const socket = io("http://localhost:5001", {
+    if (!token) {
+      setConnectionError("No authentication token found");
+      return;
+    }
+
+    socketRef.current = io("http://localhost:5001", {
       auth: {
         token: token
       }
-    }
-    )
+    })
 
-    socket.on("message", (message) => {
+    socketRef.current.on("connect", () => {
+      console.log("Socket connected:", socketRef.current?.id);
+      setConnectionError(null);
+    })
+
+    socketRef.current.on("connect_error", (err) => {
+      console.error("Connection error:", err.message);
+      setConnectionError(`Connection error: ${err.message}`);
+    })
+
+    socketRef.current.on("message", (message) => {
       setMessages((prev) => [...prev, message])
     })
 
-    socket.on("previousMessages", (previousMessages) => {
-      setMessages(previousMessages);
-    })
+    socketRef.current.on("previousMessages", (previousMessages) => {
+      setMessages(previousMessages)
+    });
 
     return () => {
-      socket.off("message")
-      socket.off("previous-messages")
-    }
-  }, [])
+      if (socketRef.current) {
+        socketRef.current.disconnect()
+        socketRef.current = null
+      }
+    };
+  }, []);
 
   const handleSendMessage = (message: string) => {
-    if(message.trim() !== "") {
-      socket.emit("sendMessage", { message, username, room })
+    if (message.trim() !== "" && socketRef.current) {
+      socketRef.current.emit("sendMessage", { message, username, room })
     }
   };
 
   const handleJoinRoom = () => {
-    if(username.trim() !== "" && room.trim() !== "") {
-      socket.emit("join-room", { username, room });
+    if (username.trim() !== "" && room.trim() !== "" && socketRef.current) {
+      socketRef.current.emit("join-room", { username, room })
       setJoined(true);
-      console.log(username, room);
+      console.log("Joining room:", username, room);
     }
-  }
+  };
 
   const handleLeaveRoom = () => {
-    socket.emit("leave-room", { username, room });
-    setJoined(false);
-    setMessages([]);
-    setRoom("");
+    if (socketRef.current) {
+      socketRef.current.emit("leave-room", { username, room });
+      setJoined(false);
+      setMessages([]);
+      setRoom("");
+    }
   };
+
   return (
     <div className="flex justify-center mt-5 mr-2 w-full">
+      {connectionError && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded absolute top-0 right-0 m-4">
+          {connectionError}
+        </div>
+      )}
+      
       {!joined ? (
-        <div className=" flex w-full max-w-3xl mx-auto flex-col items-center">
+        <div className="flex w-full max-w-3xl mx-auto flex-col items-center">
           <nav>
             <Logout />
           </nav>
@@ -85,6 +110,7 @@ export default function Home() {
           <button
             onClick={handleJoinRoom}
             className="px-4 py-2 text-white bg-blue-500 rounded-lg"
+            disabled={!socketRef.current || !!connectionError}
           >
             Join Room
           </button>
@@ -98,8 +124,8 @@ export default function Home() {
                 key={msg.id || index}
                 sender={msg.sender}
                 message={msg.message}
-                isOwnMessage={msg.sender == username}
-                timestamp={msg.timestamp} // TODO: Fix timestamp
+                isOwnMessage={msg.sender === username}
+                timestamp={new Date(msg.timestamp)}
               />
             ))}
           </div>
@@ -107,7 +133,7 @@ export default function Home() {
 
           <button
             onClick={handleLeaveRoom}
-            className="px-4 py-2 text-white bg-blue-500 rounded-lg"
+            className="px-4 py-2 mt-2 text-white bg-blue-500 rounded-lg"
           >
             Leave the room
           </button>
