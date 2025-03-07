@@ -9,6 +9,10 @@ const messageSchema = new mongoose.Schema({
         type: String,
         ref: "User"
     },
+    receiver: {
+        type: String,
+        ref: "User"
+    },
     room: {
         type: String,
         required: true
@@ -25,6 +29,10 @@ const messageSchema = new mongoose.Schema({
     lastActive: {
         type: Date,
         default: Date.now
+    }, 
+    conversationID: {
+        type: String,
+        required: true  
     }
 })
 

@@ -6,6 +6,11 @@ const userSchema = new mongoose.Schema({
         required: true,
         unique: true
     }, 
+    username: {
+        type: String,
+        sparce: true,
+        unique: true
+    },
     otp: {
         type: String,
         required: false
@@ -13,6 +18,14 @@ const userSchema = new mongoose.Schema({
     otpExpires: {
         type: Date,
         required: false
+    }, 
+    lastActive: {
+        type: Date,
+        default: Date.now
+    }, 
+    isOnline: {
+        type: Boolean,
+        default: false
     }
 })
 
