@@ -4,6 +4,8 @@ import mongoose from "mongoose";
 import Messages from "./src/models/messageModel.js";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import Conversation from "./src/models/conversationModel.js";
+import User from "./src/models/userModel.js";
 
 dotenv.config();
 
@@ -24,6 +26,8 @@ const io = new Server(httpServer, {
     origin: "*",
   },
 });
+
+const userSocketMap = {};
 
 io.use((socket, next) => {
   console.log("Authenticating socket connection...");
@@ -49,40 +53,52 @@ io.on("connection", (socket) => {
   console.log("New authenticated connection", socket.id);
   console.log("User data:", socket.decoded);
 
+  socket.on("setUserOnline", async () => {
+    try {
+      const userId = socket.decoded.id;
+      const user = await User.findById(userId);
+
+      if (user) {
+        userSocketMap[user.username] = socket.id;
+
+        user.isOnline = true;
+        user.lastActive = new Date();
+        await user.save();
+
+        console.log(`${user.username} is online`);
+      }
+    } catch (error) {
+      console.log("Error setting user online:", error.message);
+    }
+  });
+
   socket.on("join-room", async ({ username, room }) => {
-    console.log("Joining room", room, username);
     socket.join(room);
+    console.log(`${username} joined room ${room}`);
 
     io.to(room).emit("message", {
       sender: "System",
-      message: `${username} has joined the room`,
-      timestamp: new Date()
+      message: `${username} joined the room`,
+      timestamp: new Date(),
     });
-
-    try {
-      const previousMessages = await Messages.find({ room })
-        .sort({ timestamp: 1 });
-
-      if (previousMessages.length > 0) {
-        console.log(`Sending ${previousMessages.length} previous messages to ${username}`);
-        socket.emit("previousMessages", previousMessages);
-      }
-    } catch (error) {
-      console.log("Error fetching previous messages:", error.message);
-    }
   });
 
   socket.on("sendMessage", async ({ message, username, room }) => {
     try {
-      console.log(`Saving message from ${username} in room ${room}: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`);
-      
+      console.log(
+        `Saving message from ${username} in room ${room}: "${message.substring(
+          0,
+          30
+        )}${message.length > 30 ? "..." : ""}"`
+      );
+
       const newMessage = new Messages({
         message,
         room,
         sender: username,
         timestamp: new Date(),
       });
-      
+
       await newMessage.save();
       console.log("Message saved successfully with ID:", newMessage._id);
 
@@ -98,17 +114,98 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("leave-room", ({ username, room }) => {
-    socket.leave(room);
-    io.to(room).emit("message", {
-      sender: "System",
-      message: `${username} has left the room`,
-      timestamp: new Date()
-    });
+  socket.on("startconversation", async ({ targetUsername }) => {
+    const currentUser = socket.decoded.username;
+
+    try {
+      let conversation = await Conversation.findOne({
+        members: { $all: [currentUser, targetUsername] },
+      });
+
+      if (!conversation) {
+        conversation = new Conversation({
+          members: [currentUser, targetUsername],
+        });
+
+        await conversation.save();
+      }
+
+      const conversationId = conversation._id.toString();
+      socket.join(conversationId);
+
+      const previousMessages = await Messages.find({
+        conversationID: conversationId,
+      }).sort({ timestamp: 1 });
+
+      socket.emit("previousMessages", previousMessages);
+
+      socket.emit("conversationStarted", {
+        conversationId,
+        with: targetUsername,
+      });
+    } catch (error) {
+      console.error("Error starting conversation:", error.message);
+      socket.emit("conversationError", { error: error.message });
+    }
   });
 
-  socket.on("disconnect", () => {
-    console.log("Client disconnected:", socket.id);
+  socket.on("sendDirectMessage", async ({ message, targetUsername, conversationId }) => {
+    const currentUser = socket.decoded.username;
+
+    try {
+      const newMessage = new Messages({
+        sender: currentUser,
+        receiver: targetUsername,
+        message,
+        room: "",
+        conversationID: conversationId,
+        timestamp: new Date(),
+      });
+
+      await newMessage.save();
+
+      await Conversation.findByIdAndUpdate(conversationId, {
+        lastMessage: newMessage._id,
+        lastMessageTimestamp: new Date(),
+      });
+
+      io.to(conversationId).emit("message", {
+        sender: currentUser,
+        message,
+        id: newMessage._id,
+        timestamp: newMessage.timestamp,
+      });
+
+      const recipientSocketId = userSocketMap[targetUsername];
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit("newMessageNotification", {
+          conversationId,
+          from: currentUser,
+        });
+      }
+    } catch (error) {
+      console.log("Error sending direct message:", error.message);
+      socket.emit("messageError", { error: error.message });
+    }
+  });
+
+  socket.on("disconnect", async () => {
+    try {
+      const username = socket.decoded.username;
+      delete userSocketMap[username];
+
+      await User.findOneAndUpdate(
+        { username },
+        {
+          isOnline: false,
+          lastActive: new Date(),
+        }
+      );
+
+      console.log(`${username} disconnected`);
+    } catch (error) {
+      console.log("Error handling disconnect:", error.message);
+    }
   });
 });
 
