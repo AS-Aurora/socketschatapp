@@ -12,7 +12,10 @@ export async function POST(request: NextRequest) {
         const {receiverUsername} = reqbody
         const senderId = await getDataFromToken(request)
 
-        const receiver = await User.findOne({receiverUsername})
+        console.log("Receiver Username:", receiverUsername);
+        console.log("Sender ID:", senderId);
+
+        const receiver = await User.findOne({username: receiverUsername})
         if (!receiver) {
             return NextResponse.json({
                 message: "User not found",
@@ -21,12 +24,15 @@ export async function POST(request: NextRequest) {
         }
         
         let conversation = await Conversation.findOne({
-            members: { $all: [senderId, receiver._id] }
+            members: { $all: [senderId.toString(), receiver._id.toString()]}
         })
+
+        console.log("Existing Conversation Found:", conversation);
 
         if(!conversation) {
             conversation = new Conversation({
-                members: [senderId, receiver._id]
+                members: [senderId.toString(), receiver._id.toString()],
+                lastMessage: null
             })
             await conversation.save()
         }
