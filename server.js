@@ -59,7 +59,7 @@ io.on("connection", (socket) => {
       const user = await User.findById(userId);
 
       if (user) {
-        userSocketMap[user.username] = socket.id;
+        userSocketMap[user.username].push(socket.id);
 
         user.isOnline = true;
         user.lastActive = new Date();
@@ -72,9 +72,9 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("join-room", async ({ username, room }) => {
-    socket.join(room);
-    console.log(`${username} joined room ${room}`);
+  socket.on("join-room", async ({conversationId }) => {
+    socket.join(conversationId);
+    console.log(`${socket.decoded.username} joined room ${conversationId}`);
 
     io.to(room).emit("message", {
       sender: "System",
@@ -133,12 +133,6 @@ io.on("connection", (socket) => {
       const conversationId = conversation._id.toString();
       socket.join(conversationId);
 
-      const previousMessages = await Messages.find({
-        conversationID: conversationId,
-      }).sort({ timestamp: 1 });
-
-      socket.emit("previousMessages", previousMessages);
-
       socket.emit("conversationStarted", {
         conversationId,
         with: targetUsername,
@@ -149,15 +143,27 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("loadMessages", async ({ conversationId, page=1, limit=20}) => {
+    try {
+      const messages = await Messages.find({conversationID: conversationId}).sort({timestamp: -1}).skip((page-1)*limit).limit(limit);
+      socket.emit("previousMessages", { conversationId, messages });
+    } catch (error) {
+      console.error("Error loading messages:", error.message);
+      socket.emit("messageError", { error: error.message });
+    }
+  })
+
   socket.on("sendDirectMessage", async ({ message, targetUsername, conversationId }) => {
     const currentUser = socket.decoded.username;
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
     try {
       const newMessage = new Messages({
         sender: currentUser,
         receiver: targetUsername,
         message,
-        room: "",
         conversationID: conversationId,
         timestamp: new Date(),
       });
@@ -167,7 +173,10 @@ io.on("connection", (socket) => {
       await Conversation.findByIdAndUpdate(conversationId, {
         lastMessage: newMessage._id,
         lastMessageTimestamp: new Date(),
-      });
+      }, { session })
+
+      await session.commitTransaction()
+      session.endSession();
 
       io.to(conversationId).emit("message", {
         sender: currentUser,
@@ -184,6 +193,8 @@ io.on("connection", (socket) => {
         });
       }
     } catch (error) {
+      await session.abortTransaction()
+      session.endSession()
       console.log("Error sending direct message:", error.message);
       socket.emit("messageError", { error: error.message });
     }
@@ -192,17 +203,26 @@ io.on("connection", (socket) => {
   socket.on("disconnect", async () => {
     try {
       const username = socket.decoded.username;
-      delete userSocketMap[username];
 
-      await User.findOneAndUpdate(
-        { username },
-        {
-          isOnline: false,
-          lastActive: new Date(),
+      if(userSocketMap[username]) {
+        userSocketMap[username] = userSocketMap[username].filter(id => id!==socket.id)
+        if(userSocketMap[username].length === 0) {
+          delete userSocketMap[username]
+
+
+          delete userSocketMap[username];
+          
+          await User.findOneAndUpdate(
+            { username },
+            {
+              isOnline: false,
+              lastActive: new Date(),
+            }
+          );
+          
+          console.log(`${username} disconnected`);
         }
-      );
-
-      console.log(`${username} disconnected`);
+      }
     } catch (error) {
       console.log("Error handling disconnect:", error.message);
     }
