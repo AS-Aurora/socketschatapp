@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { type } from "os";
 
 const userSchema = new mongoose.Schema({
     email: {
@@ -26,7 +27,11 @@ const userSchema = new mongoose.Schema({
     isOnline: {
         type: Boolean,
         default: false
-    }
+    }, 
+    contacts: [{
+        type: [String],
+        ref: 'users'
+    }]
 })
 
 const User = mongoose.models.users || mongoose.model('users', userSchema)

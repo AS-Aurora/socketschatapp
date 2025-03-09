@@ -13,10 +13,6 @@ const messageSchema = new mongoose.Schema({
         type: String,
         ref: "User"
     },
-    room: {
-        type: String,
-        required: true
-    },
     timestamp: {
         type: Date,
         default: Date.now
@@ -31,7 +27,8 @@ const messageSchema = new mongoose.Schema({
         default: Date.now
     }, 
     conversationID: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "conversations",
         required: true  
     }
 })

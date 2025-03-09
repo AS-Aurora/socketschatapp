@@ -1,33 +1,34 @@
 import mongoose from "mongoose";
 
 const conversationSchema = new mongoose.Schema({
-    members: [
-        {
-            type: String,
-            ref: "User",
-        }
-    ], 
-    lastMessage: {
-        type: mongoose.Schema.Types.ObjectId, 
-        default: "",
-        ref: "messages"
+  members: [
+    {
+      type: String,
+      ref: "User",
     },
-    lastMessageTime: {
-        type: Date,
-        default: Date.now
-    }, 
-    isActive: {
-        type: Boolean,
-        default: true
-    }, 
-    createdAt: {
-        type: Date,
-        default: Date.now
-    } 
-    })
+  ],
+  lastMessage: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "messages",
+    default: null,
+  },
+  lastMessageTime: {
+    type: Date,
+    default: Date.now
+  },
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+});
 
-    conversationSchema.index({members: 1}, {unique: true})
+conversationSchema.index({ members: 1 }, { unique: true });
 
-
-const Conversation = mongoose.models.conversations || mongoose.model("conversations", conversationSchema)
-export default Conversation
+const Conversation =
+  mongoose.models.conversations ||
+  mongoose.model("conversations", conversationSchema);
+export default Conversation;
