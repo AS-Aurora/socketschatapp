@@ -31,7 +31,11 @@ const userSchema = new mongoose.Schema({
     contacts: [{
         type: [String],
         ref: 'users'
-    }]
+    }], 
+    profilePicture: {
+        type: String,
+        default: ''
+    }
 })
 
 const User = mongoose.models.users || mongoose.model('users', userSchema)
