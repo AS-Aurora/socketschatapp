@@ -26,13 +26,13 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await imageFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const extension = imageFile.type.split("/")[1]; // "jpeg" for "image/jpeg"
+    const extension = imageFile.type.split("/")[1];
     if (!["jpeg", "png", "jpg", "gif", "webp"].includes(extension)) {
       return NextResponse.json({ message: "Unsupported image format", success: false });
     }
 
-    const base64 = buffer.toString("base64");
-    const dataURI = `data:image/jpeg;base64,${base64}`
+    const base64 = buffer.toString("base64"); // making it easier for APIs to consume
+    const dataURI = `data:image/jpeg;base64,${base64}` // converting buffer to data URI to send to cloudinary
 
     const upload = await cloudinary.uploader.upload(dataURI, {
       folder: "chat_app_profile_pictures",

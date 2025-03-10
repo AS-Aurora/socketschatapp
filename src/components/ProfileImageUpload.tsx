@@ -1,10 +1,9 @@
 "use client";
 
 import axios from "axios";
-import { set } from "mongoose";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ReactEventHandler, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 interface ProfileImageUploadProps {
   currImgId?: string;
