@@ -2,16 +2,14 @@ import { connect } from "@/src/dbconfig/dbconfig";
 import User from "@/src/models/userModel";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
-import { use } from "react";
 
 
 connect()
 
 
-export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-    const params = use(context.params)
-    const { id } = params
-
+export async function GET(request: NextRequest, context: { params: { id: string } }) {
+    const { id } = context.params
+    
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return NextResponse.json({ message: "Invalid ID" }, { status: 400 });
     }
