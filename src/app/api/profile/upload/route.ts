@@ -4,7 +4,7 @@ import { getDataFromToken } from "@/src/helpers/getdatafromtoken";
 import User from "../../../../models/userModel";
 import { connect } from "@/src/dbconfig/dbconfig";
 
-connect();
+connect()
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,12 +44,6 @@ export async function POST(request: NextRequest) {
       { profilePicture: upload.secure_url },
       { new: true }
     ).select("-password");
-
-    console.log("Form Data: ", formData);
-console.log("Image File: ", imageFile);
-console.log("Image Type: ", imageFile.type);
-console.log("Updated User:", updatedUser);
-
 
     return NextResponse.json({
       message: "Profile picture updated",
