@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema({
     }, 
     username: {
         type: String,
-        sparce: true,
+        sparse: true,
         unique: true
     },
     otp: {
@@ -29,7 +29,7 @@ const userSchema = new mongoose.Schema({
         default: false
     }, 
     contacts: [{
-        type: [String],
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'users'
     }], 
     profilePicture: {
