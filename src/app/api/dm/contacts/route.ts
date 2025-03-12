@@ -6,7 +6,6 @@ import mongoose from "mongoose";
 
 export async function GET(request: NextRequest) {
     try {
-
         await connect();
 
         const userId = await getDataFromToken(request);
@@ -20,7 +19,7 @@ export async function GET(request: NextRequest) {
 
         const user = await User.findById(userId)
             .populate("contacts", "_id username profilePicture")
-            .exec();
+            .exec()
 
         if (!user) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });

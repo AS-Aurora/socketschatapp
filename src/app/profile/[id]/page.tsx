@@ -3,15 +3,17 @@
 import Logout from "@/src/components/Logout";
 import axios from "axios";
 import React, { use, useEffect, useRef, useState } from "react";
-import ProfileImageUpload from "../../../components/ProfileImageUpload"
+import ProfileImageUpload from "../../../components/ProfileImageUpload";
+import { useRouter } from "next/navigation";
 
-const Profile = (context: {params: Promise<{id: string}>}) => {
+const Profile = (context: { params: Promise<{ id: string }> }) => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [newUsername, setNewUsername] = useState<string>("");
-  const params = use(context.params)
-  const [editing, setEditing] = useState<boolean>(false)
-  const { id } = params
+  const params = use(context.params);
+  const [editing, setEditing] = useState<boolean>(false);
+  const { id } = params;
+  const router = useRouter();
 
   useEffect(() => {
     console.log("Fetching user with ID:", id);
@@ -20,13 +22,13 @@ const Profile = (context: {params: Promise<{id: string}>}) => {
         const response = await axios.get(`/api/profile/${id}`);
         setUser(response.data);
         console.log("User found:", user);
-        
+
         setLoading(false);
       } catch (error) {
         console.log("Error fetching user:", error);
       }
     };
-  
+
     if (id) fetchUser();
   }, [id]);
 
@@ -42,10 +44,23 @@ const Profile = (context: {params: Promise<{id: string}>}) => {
     }
   };
 
+  const handleBack = () => {
+    router.push("/");
+  };
+
   return (
     <div className="flex h-screen">
       <div className="w-1/2 bg-gray-100 p-6 shadow-md">
-        <h2 className="text-lg font-semibold mb-4 text-black">Profile</h2>
+        <div className="flex items-center mb-4">
+          <button
+            className="bg-gray-200 text-black px-4 py-2 rounded-md hover:bg-gray-300"
+            onClick={handleBack}
+          >
+            Back
+          </button>
+          <h2 className="text-lg font-semibold text-black mx-3">Profile</h2>
+        </div>
+
         {loading ? (
           <p>Loading...</p>
         ) : (
@@ -59,7 +74,9 @@ const Profile = (context: {params: Promise<{id: string}>}) => {
             />
 
             <div className="flex items-center justify-between">
-              <h1 className="text-xl font-bold text-black">Username: {user?.username}</h1>
+              <h1 className="text-xl font-bold text-black">
+                Username: {user?.username}
+              </h1>
               <button onClick={() => setEditing(!editing)}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

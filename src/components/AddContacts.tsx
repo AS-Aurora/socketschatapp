@@ -14,9 +14,7 @@ const AddContacts = ({ onClose, onContactAdded }: { onClose: () => void; onConta
         setError("");
         setLoading(true);
 
-        try {
-            console.log("entered try block");
-            
+        try {            
             const response = await axios.post("/api/dm/addcontact", { username, email });
             console.log(response.data)
             if (response.data.success) {
