@@ -19,5 +19,5 @@ export function middleware(request: NextRequest) {
 
 
 export const config = {
-  matcher: ["/, /((?!api/dm/contacts).*)"],
+  matcher: ["/", "/profile/:path*"],
 };
