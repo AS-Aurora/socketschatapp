@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import axios from "axios";
+import { useRouter } from "next/navigation";
 
 const AddContacts = ({ onClose, onContactAdded }: { onClose: () => void; onContactAdded: () => void }) => {
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const router = useRouter()
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -28,6 +30,8 @@ const AddContacts = ({ onClose, onContactAdded }: { onClose: () => void; onConta
         }
 
         setLoading(false);
+        router.refresh()
+
     };
 
     return (

@@ -4,10 +4,11 @@ import axios from "axios";
 import React, { useEffect, useState } from "react";
 import AddContacts from "./AddContacts";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const Sidebar = ({ onSelect }: { onSelect: (id: string) => void }) => {
-  const [contacts, setContacts] = useState<{ id: string; username: string; profilePicture?: string }[]>(
-    []
+  const [contacts, setContacts] = useState<{ _id: string; username: string; profilePicture?: string }[]>(
+    [],
   );
   const [search, setSearch] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -78,11 +79,13 @@ const Sidebar = ({ onSelect }: { onSelect: (id: string) => void }) => {
     >
       <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
         {contact.profilePicture ? (
-          <img 
-            src={contact.profilePicture} 
-            alt={`${contact.username}'s profile`}
-            className="w-full h-full object-cover"
-          />
+          <Link href={`/profile/${contact?._id}`}>
+            <img 
+              src={contact.profilePicture} 
+              alt={`${contact.username}'s profile`}
+              className="w-full h-full object-cover"
+            />
+          </Link>
         ) : (
           <div className="w-full h-full bg-gray-500 flex items-center justify-center text-white">
             {contact.username.charAt(0).toUpperCase()}

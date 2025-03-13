@@ -8,37 +8,43 @@ import { useRouter } from "next/navigation";
 
 const Profile = (context: { params: Promise<{ id: string }> }) => {
   const [user, setUser] = useState<any>(null);
+  const [loggedInUser, setLoggedInUser] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [newUsername, setNewUsername] = useState<string>("");
-  const params = use(context.params);
   const [editing, setEditing] = useState<boolean>(false);
+  const params = use(context.params);
   const { id } = params;
   const router = useRouter();
 
   useEffect(() => {
-    console.log("Fetching user with ID:", id);
-    const fetchUser = async () => {
+    const fetchData = async () => {
       try {
-        const response = await axios.get(`/api/profile/${id}`);
-        setUser(response.data);
-        console.log("User found:", user);
-
+        const [profileResponse, loggedInResponse] = await Promise.all([
+          axios.get(`/api/profile/${id}`),
+          axios.get("/api/users/me"),
+        ]);
+        setUser(profileResponse.data);
+        setLoggedInUser(loggedInResponse.data);
         setLoading(false);
       } catch (error) {
-        console.log("Error fetching user:", error);
+        console.log(error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    if (id) fetchUser();
+    fetchData();
   }, [id]);
 
   const handleUpdateUsername = async () => {
+    if (loggedInUser?._id !== id) return;
+
     try {
       const response = await axios.put(`/api/profile/${id}`, {
         username: newUsername,
       });
-      setUser(response.data)
-      setEditing(false)
+      setUser(response.data);
+      setEditing(false);
     } catch (error) {
       console.log(error);
     }
@@ -65,37 +71,50 @@ const Profile = (context: { params: Promise<{ id: string }> }) => {
           <p>Loading...</p>
         ) : (
           <div className="flex flex-col space-y-4">
-            <ProfileImageUpload
-              currImgId={user?.profilePicture || "/default.img"}
-              userId={id}
-              onSuccess={(imageUrl) => {
-                setUser((prev: any) => ({ ...prev, profilePicture: imageUrl }));
-              }}
-            />
+            {loggedInUser?._id === id ? (
+              <ProfileImageUpload
+                currImgId={user?.profilePicture || "/default.img"}
+                userId={id}
+                onSuccess={(imageUrl) => {
+                  setUser((prev: any) => ({
+                    ...prev,
+                    profilePicture: imageUrl,
+                  }));
+                }}
+              />
+            ) : (
+              <img
+                src={user?.profilePicture || "/default.img"}
+                alt="Profile"
+                className="w-24 h-24 rounded-full object-cover"
+              />
+            )}
 
             <div className="flex items-center justify-between">
               <h1 className="text-xl font-bold text-black">
                 Username: {user?.username}
               </h1>
-              <button onClick={() => setEditing(!editing)}>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="w-6 h-6 text-blue-500 hover:text-blue-700"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                  />
-                </svg>
-              </button>
+              {loggedInUser?._id === id && (
+                <button onClick={() => setEditing(!editing)}>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="w-6 h-6 text-blue-500 hover:text-blue-700"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                    />
+                  </svg>
+                </button>
+              )}
             </div>
 
-            {editing && (
+            {editing && loggedInUser?._id === id && (
               <div className="flex items-center space-x-2">
                 <input
                   type="text"
@@ -114,7 +133,10 @@ const Profile = (context: { params: Promise<{ id: string }> }) => {
             )}
           </div>
         )}
+        {loggedInUser?._id === id && (
+
         <Logout />
+        )}
       </div>
     </div>
   );
