@@ -6,32 +6,31 @@ const messageSchema = new mongoose.Schema({
         required: true,
     },
     sender: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "User"
     },
     receiver: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "User"
     },
     timestamp: {
         type: Date,
-        default: Date.now
+        default: Date.now, 
+        index: true
     }, 
     status: {
         type: String,
         enum: ["sent", "delivered", "read"],
         default: "sent"
     },
-    lastActive: {
-        type: Date,
-        default: Date.now
-    }, 
     conversationID: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "conversations",
+        ref: "Conversation",
         required: true  
     }
 })
+
+messageSchema.index({ conversationID: 1, timestamp: -1 });
 
 const Messages = mongoose.models.messages || mongoose.model('messages', messageSchema)
 
