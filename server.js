@@ -9,227 +9,233 @@ import User from "./src/models/userModel.js";
 
 dotenv.config();
 
-const connectionString = process.env.MONGODB_URI
+const connectionString = process.env.MONGODB_URI;
 
-mongoose.set('strictQuery', false);
+mongoose.set("strictQuery", false);
 
-mongoose.connect(connectionString)
+mongoose
+  .connect(connectionString)
   .then(() => console.log("Connected to MongoDB successfully!"))
-  .catch(err => {
+  .catch((err) => {
     console.error("MongoDB connection error:", err.message);
-    console.error("Please check if your MongoDB server is running and the connection string is correct.");
+    console.error(
+      "Please check if your MongoDB server is running and the connection string is correct."
+    );
   });
 
 const httpServer = createServer();
-const io = new Server(httpServer, {
+export const io = new Server(httpServer, {
   cors: {
     origin: "*",
   },
 });
 
-const userSocketMap = {};
+const userSocketMap = {}
 
-io.use((socket, next) => {
-  console.log("Authenticating socket connection...");
-  const token = socket.handshake.auth.token;
+// Track which users are in which conversation rooms
+const conversationRooms = {}
+
+io.use(async (socket, next) => {
+    const token = socket.handshake.auth?.token;
   
-  if (!token) {
-    console.log("No token provided");
-    return next(new Error("Authentication error: No token provided"));
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.TOKEN_SECRET);
-    console.log("Authentication successful for user:", decoded.email);
-    socket.decoded = decoded;
-    next();
-  } catch (error) {
-    console.log("Token verification failed:", error.message);
-    next(new Error("Authentication error: Invalid token"));
-  }
-});
-
-io.on("connection", (socket) => {
-  console.log("New authenticated connection", socket.id);
-  console.log("User data:", socket.decoded);
-
-  socket.on("setUserOnline", async () => {
-    try {
-      const userId = socket.decoded.id;
-      const user = await User.findById(userId);
-
-      if (user) {
-        userSocketMap[user.username].push(socket.id);
-
-        user.isOnline = true;
-        user.lastActive = new Date();
-        await user.save();
-
-        console.log(`${user.username} is online`);
-      }
-    } catch (error) {
-      console.log("Error setting user online:", error.message);
+    if (!token) {
+      return next(new Error("Authentication error: No token provided"));
     }
-  });
-
-  socket.on("join-room", async ({conversationId }) => {
-    socket.join(conversationId);
-    console.log(`${socket.decoded.username} joined room ${conversationId}`);
-
-    io.to(room).emit("message", {
-      sender: "System",
-      message: `${username} joined the room`,
-      timestamp: new Date(),
-    });
-  });
-
-  socket.on("sendMessage", async ({ message, username, room }) => {
+  
     try {
-      console.log(
-        `Saving message from ${username} in room ${room}: "${message.substring(
-          0,
-          30
-        )}${message.length > 30 ? "..." : ""}"`
-      );
+      const decoded = jwt.verify(token, process.env.TOKEN_SECRET);
 
-      const newMessage = new Messages({
-        message,
-        room,
-        sender: username,
-        timestamp: new Date(),
-      });
-
-      await newMessage.save();
-      console.log("Message saved successfully with ID:", newMessage._id);
-
-      io.to(room).emit("message", {
-        sender: username,
-        message,
-        id: newMessage._id,
-        timestamp: newMessage.timestamp,
-      });
-    } catch (error) {
-      console.error("Error saving message:", error.message);
-      socket.emit("messageError", { error: "Failed to save message" });
-    }
-  });
-
-  socket.on("startconversation", async ({ targetUsername }) => {
-    const currentUser = socket.decoded.username;
-
-    try {
-      let conversation = await Conversation.findOne({
-        members: { $all: [currentUser, targetUsername] },
-      });
-
-      if (!conversation) {
-        conversation = new Conversation({
-          members: [currentUser, targetUsername],
-        });
-
-        await conversation.save();
+      const user = await User.findOne({ email: decoded.email }).select("username");
+      if (!user) {
+        return next(new Error("Authentication error: User not found"));
       }
 
-      const conversationId = conversation._id.toString();
-      socket.join(conversationId);
-
-      socket.emit("conversationStarted", {
-        conversationId,
-        with: targetUsername,
-      });
+      // Store user info inside socket object
+      socket.user = { ...decoded, username: user.username }
+  
+      if (!decoded.username) {
+        console.log("Token is missing 'username' field:", decoded);
+        return next(new Error("Authentication error: Username missing in token"));
+      }
+  
+      // Store user info inside socket object  
+      next()
     } catch (error) {
-      console.error("Error starting conversation:", error.message);
-      socket.emit("conversationError", { error: error.message });
-    }
-  });
-
-  socket.on("loadMessages", async ({ conversationId, page=1, limit=20}) => {
-    try {
-      const messages = await Messages.find({conversationID: conversationId}).sort({timestamp: -1}).skip((page-1)*limit).limit(limit);
-      socket.emit("previousMessages", { conversationId, messages });
-    } catch (error) {
-      console.error("Error loading messages:", error.message);
-      socket.emit("messageError", { error: error.message });
+      next(new Error("Authentication error: Invalid token"));
     }
   })
 
-  socket.on("sendDirectMessage", async ({ message, targetUsername, conversationId }) => {
-    const currentUser = socket.decoded.username;
+io.on("connection", async (socket) => {
+  console.log("🔗 WebSocket connected:", socket.id, `(User: ${socket.user.email})`);
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+  const username = socket.user.username
+  userSocketMap[username] = socket.id
 
-    try {
-      const newMessage = new Messages({
-        sender: currentUser,
-        receiver: targetUsername,
-        message,
-        conversationID: conversationId,
-        timestamp: new Date(),
-      });
+  await User.findOneAndUpdate(
+      { username },
+      { isOnline: true, lastActive: new Date() }
+  );
 
-      await newMessage.save();
+  socket.broadcast.emit("userStatusUpdate", { username, isOnline: true });
 
-      await Conversation.findByIdAndUpdate(conversationId, {
-        lastMessage: newMessage._id,
-        lastMessageTimestamp: new Date(),
-      }, { session })
-
-      await session.commitTransaction()
-      session.endSession();
-
-      io.to(conversationId).emit("message", {
-        sender: currentUser,
-        message,
-        id: newMessage._id,
-        timestamp: newMessage.timestamp,
-      });
-
-      const recipientSocketId = userSocketMap[targetUsername];
-      if (recipientSocketId) {
-        io.to(recipientSocketId).emit("newMessageNotification", {
-          conversationId,
-          from: currentUser,
-        });
+  // Join conversation room
+  socket.on("joinConversation", async (data) => {
+      try {
+          const conversationId = data.conversationId;
+          
+          // Join the socket to the conversation room
+          socket.join(conversationId);
+          
+          // Track which users are in this conversation room
+          if (!conversationRooms[conversationId]) {
+              conversationRooms[conversationId] = new Set();
+          }
+          conversationRooms[conversationId].add(username);
+          
+      } catch (error) {
+          console.error("Error joining conversation:", error.message);
       }
-    } catch (error) {
-      await session.abortTransaction()
-      session.endSession()
-      console.log("Error sending direct message:", error.message);
-      socket.emit("messageError", { error: error.message });
-    }
   });
 
-  socket.on("disconnect", async () => {
-    try {
-      const username = socket.decoded.username;
-
-      if(userSocketMap[username]) {
-        userSocketMap[username] = userSocketMap[username].filter(id => id!==socket.id)
-        if(userSocketMap[username].length === 0) {
-          delete userSocketMap[username]
-
-
-          delete userSocketMap[username];
+  // Leave conversation room - NEW HANDLER
+  socket.on("leaveConversation", async (data) => {
+      try {
+          const conversationId = data.conversationId;
+          console.log(`👋 User ${username} leaving conversation room:`, conversationId);
           
-          await User.findOneAndUpdate(
-            { username },
-            {
-              isOnline: false,
-              lastActive: new Date(),
-            }
-          );
+          // Remove socket from the conversation room
+          socket.leave(conversationId);
           
-          console.log(`${username} disconnected`);
-        }
+          // Update tracking
+          if (conversationRooms[conversationId]) {
+              conversationRooms[conversationId].delete(username);
+              if (conversationRooms[conversationId].size === 0) {
+                  delete conversationRooms[conversationId];
+              }
+          }
+      } catch (error) {
+          console.error("Error leaving conversation:", error.message);
       }
-    } catch (error) {
-      console.log("Error handling disconnect:", error.message);
-    }
+  });
+
+  // Start a conversation
+//   socket.on("startconversation", async ({ targetUsername }) => {
+//       try {
+//           let conversation = await Conversation.findOne({
+//               members: { $all: [username, targetUsername] }
+//           });
+
+//           if (!conversation) {
+//               conversation = new Conversation({
+//                   members: [username, targetUsername],
+//               });
+//               await conversation.save();
+//           }
+
+//           socket.emit("conversationStarted", {
+//               conversationId: conversation._id,
+//               with: targetUsername,
+//           });
+//       } catch (error) {
+//           socket.emit("conversationError", { error: error.message });
+//       }
+//   });
+
+  // Load previous messages
+  socket.on("loadMessages", async ({ conversationId, page = 1, limit = 20 }) => {
+      try {
+          const messages = await Messages.find({ conversationID: conversationId })
+              .sort({ timestamp: -1 })
+              .skip((page - 1) * limit)
+              .limit(limit)
+              .lean();
+
+          socket.emit("previousMessages", { conversationId, messages });
+      } catch (error) {
+          socket.emit("messageError", { error: error.message });
+      }
+  });
+
+  // Send a direct message
+  socket.on("sendDirectMessage", async (data) => {
+      try {
+
+          const messageData = {
+              sender: data.senderId || data.senderUsername,
+              receiver: data.receiverId || data.receiverUsername,
+              message: data.message,
+              timestamp: new Date(),
+              conversationID: data.conversationID,
+              read: false
+          };
+
+          // Save message to MongoDB
+          const savedMessage = new Messages(messageData);
+          await savedMessage.save();
+
+          // Normalize the response to match the client's expected format
+          const normalizedMessage = {
+              _id: savedMessage._id,
+              message: savedMessage.message,
+              sender: savedMessage.sender,
+              receiver: savedMessage.receiver,
+              conversationID: savedMessage.conversationID,
+              timestamp: savedMessage.timestamp,
+              read: savedMessage.read
+          };
+
+          // Emit to all clients in the conversation room (including sender)
+          io.to(data.conversationID).emit("message", normalizedMessage);
+          
+          // If receiver is not in room, send it directly to their socket
+          const receiverUsername = data.receiverId || data.receiverUsername;
+          const receiverSocketId = userSocketMap[receiverUsername];
+          
+          if (receiverSocketId && (!conversationRooms[data.conversationID] || 
+              !conversationRooms[data.conversationID].has(receiverUsername))) {
+              io.to(receiverSocketId).emit("message", normalizedMessage);
+          }
+      } catch (error) {
+          socket.emit("messageError", { error: error.message });
+      }
+  });
+
+  // Handle typing status
+  socket.on("typing", async ({ targetUsername, isTyping }) => {
+      if (userSocketMap[targetUsername]) {
+          io.to(userSocketMap[targetUsername]).emit("typing", { username, isTyping });
+      }
+  });
+
+  // Handle disconnection
+  socket.on("disconnect", async () => {
+      try {
+          console.log("WebSocket disconnected:", socket.id, `(User: ${username})`);
+          delete userSocketMap[username];
+
+          // Remove user from all conversation rooms
+          for (const [roomId, users] of Object.entries(conversationRooms)) {
+              if (users.has(username)) {
+                  users.delete(username);
+                  if (users.size === 0) {
+                      delete conversationRooms[roomId];
+                  }
+              }
+          }
+
+          await User.findOneAndUpdate(
+              { username },
+              { isOnline: false, lastActive: new Date() }
+          );
+
+          socket.broadcast.emit("userStatusUpdate", { username, isOnline: false });
+      } catch (error) {
+          console.log("Error handling disconnect:", error.message);
+      }
   });
 });
 
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5002;
 httpServer.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
