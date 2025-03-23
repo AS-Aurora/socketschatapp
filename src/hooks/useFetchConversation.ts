@@ -2,17 +2,7 @@ import axios from 'axios'
 import React, { useEffect, useState } from 'react'
 import useFetchReceiver from './useFetchReceiver'
 import useFetchUser from './useFetchUser'
-
-interface Message {
-    _id: string
-    message: string
-    sender: string
-    receiver: string
-    conversationID: string
-    timestamp: string
-    read: boolean
-    status: string
-}
+import { Message } from "./types"
 
 interface MessagesResponse {
     messages: Message[]
