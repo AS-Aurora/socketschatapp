@@ -78,7 +78,7 @@ const ProfileImageUpload = ({
         {imageUrl ? (
           <Image
             src={imageUrl}
-            alt="Profile Picture"
+            alt="https://static.vecteezy.com/system/resources/thumbnails/024/983/914/small/simple-user-default-icon-free-png.png"
             fill
             style={{ objectFit: "cover" }}
           />
