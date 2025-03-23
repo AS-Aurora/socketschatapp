@@ -84,7 +84,10 @@ const Profile = (context: { params: Promise<{ id: string }> }) => {
               />
             ) : (
               <img
-                src={user?.profilePicture || "/default.img"}
+                src={
+                  user?.profilePicture ||
+                  "https://static.vecteezy.com/system/resources/thumbnails/024/983/914/small/simple-user-default-icon-free-png.png"
+                }
                 alt="Profile"
                 className="w-24 h-24 rounded-full object-cover"
               />
@@ -133,10 +136,7 @@ const Profile = (context: { params: Promise<{ id: string }> }) => {
             )}
           </div>
         )}
-        {loggedInUser?._id === id && (
-
-        <Logout />
-        )}
+        {loggedInUser?._id === id && <Logout />}
       </div>
     </div>
   );

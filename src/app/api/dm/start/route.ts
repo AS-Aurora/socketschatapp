@@ -20,8 +20,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({
                 message: "User not found",
                 success: false
-            })
+            }, {status: 404})
         }
+
+        if (receiver._id.toString() === senderId.toString()) {
+            return NextResponse.json({ error: "You cannot start a conversation with yourself" });
+          }
         
         let conversation = await Conversation.findOne({
             members: { $all: [senderId.toString(), receiver._id.toString()]}
@@ -31,7 +35,7 @@ export async function POST(request: NextRequest) {
 
         if(!conversation) {
             conversation = new Conversation({
-                members: [senderId.toString(), receiver._id.toString()],
+                members: [senderId, receiver._id],
                 lastMessage: null
             })
             await conversation.save()
