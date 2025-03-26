@@ -7,11 +7,16 @@ import useFetchReceiver from "../hooks/useFetchReceiver"
 import useFetchConversation from "../hooks/useFetchConversation"
 import useSendMessage from "../hooks/useSendMessage"
 import useMessageHandling from "../hooks/useMessage"
+import useWebRTC from '../hooks/useWebRTC'
+import CallModal from '../components/CallModal'
+import { Phone, Video } from "lucide-react"
 
 const ChatArea = ({ chatId }: { chatId: string }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false)
+  const [isReceiverOnline, setIsReceiverOnline] = useState(false)
+  const [isReceiverTyping, setIsReceiverTyping] = useState(false)
 
   // Get socket connection
   const { socket, isConnected } = useSocket()
@@ -58,7 +63,41 @@ const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
     isLoading,
     handleLoadMore,
     setShowNewMessageIndicator,
+    setIsReceiverOnline,
+    setIsReceiverTyping,
   })
+
+  const {
+    callUser,
+    answerCall,
+    endCall,
+    stream,
+    callState
+  } = useWebRTC({ socket, userId });
+
+  const handleStartVideoCall = () => {
+    if (receiverUsername) {
+      callUser(receiverUsername, 'video');
+    }
+  };
+
+  const handleStartAudioCall = () => {
+    if (receiverUsername) {
+      callUser(receiverUsername, 'audio');
+    }
+  }
+
+   const handleTyping = (e: FormEvent<HTMLInputElement>) => {
+    const message = (e.target as HTMLInputElement).value.trim()
+    setNewMessage(message)
+
+    if(socket && receiverUsername) {
+      socket.emit("typing", {
+        targetUsername: receiverUsername,
+        isTyping: message.length > 0,
+      })
+    }
+   }
 
   const formatMessageTime = (timestamp: string) => {
     if (!timestamp) return "Unknown time"
@@ -73,7 +112,12 @@ const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
     <div className="flex flex-col h-full bg-gray-800 text-white p-4 rounded-lg">
       {/* Chat Header */}
       <div className="h-12 border-b border-gray-700 mb-4 flex items-center justify-between">
-        <span className="font-medium">{receiverUsername || "Loading..."}</span>
+        <div>
+          <span className="font-medium">{receiverUsername || "Loading..."}</span>
+          <div className="text-xs text-gray-400">
+            {isReceiverTyping ? "Typing..." : (isReceiverOnline ? "Online" : "Offline")}
+          </div>
+        </div>
         {error && <span className="text-red-400 text-xs">{error}</span>}
       </div>
 
@@ -154,7 +198,7 @@ const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
         <input
           type="text"
           value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
+          onChange={handleTyping}
           placeholder="Type a message..."
           className="flex-1 p-2.5 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           disabled={!conversationId || isLoading}
@@ -167,6 +211,22 @@ const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
           Send
         </button>
       </form>
+
+      <div className="call-actions">
+        <button onClick={handleStartVideoCall}>
+          <Video /> Video Call
+        </button>
+        <button onClick={handleStartAudioCall}>
+          <Phone /> Audio Call
+        </button>
+      </div>
+
+      <CallModal 
+        callState={callState}
+        stream={stream}
+        answerCall={answerCall}
+        endCall={endCall}
+      />
     </div>
   )
 }

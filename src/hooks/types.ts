@@ -9,5 +9,20 @@ export interface Message {
   timestamp: string;
   readts?: string;
   status?: "sent" | "sending" | "error";
-  read: boolean; // Add the required 'read' property
+  read: boolean;
+}
+
+export interface CallSignal {
+  signal: string
+  from: string
+  to: string
+  type: 'video' | 'audio'
+}
+
+export interface CallState {
+  incomingCall: boolean
+  callAccepted: boolean
+  callRejected: boolean
+  caller: string | null
+  callType: 'video' | 'audio' | null
 }

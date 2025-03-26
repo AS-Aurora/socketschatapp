@@ -217,6 +217,24 @@ socket.on("messageSent", async ({ senderId, receiverId }) => {
       }
   })
 
+  socket.on('callUser', (data) => {
+    const targetSocketId = userSocketMap[data.to]
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('incomingCall', {
+        signal: data.signal,
+        from: data.from,
+        type: data.type
+      })
+    }
+  })
+
+  socket.on('answerCall', (data) => {
+    const callerSocketId = userSocketMap[data.to]
+    if (callerSocketId) {
+      io.to(callerSocketId).emit('callAccepted', data.signal)
+    }
+  })
+
   // Handle disconnection
   socket.on("disconnect", async () => {
       try {
