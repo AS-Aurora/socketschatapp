@@ -14,7 +14,7 @@ const ChatArea = ({ chatId }: { chatId: string }) => {
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false)
 
   // Get socket connection
-  const { socket, isConnected } = useSocket()
+  const { socket, isConnected, onlineUsers } = useSocket()
 
   // Fetch current user details
   const { userId, username } = useFetchUser()
@@ -33,19 +33,18 @@ const ChatArea = ({ chatId }: { chatId: string }) => {
     handleLoadMore,
   } = useFetchConversation({ chatId })
 
-  
-const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
-  chatId,
-  conversationId,
-  receiverUsername,
-  userId,
-  username,
-  socket,
-  setMessages,
-  messagesEndRef: messagesEndRef as RefObject<HTMLDivElement>,
-  messagesContainerRef: messagesContainerRef as RefObject<HTMLDivElement>,
-  setShowNewMessageIndicator: setShowNewMessageIndicator,
-})
+  const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
+    chatId,
+    conversationId,
+    receiverUsername,
+    userId,
+    username,
+    socket,
+    setMessages,
+    messagesEndRef: messagesEndRef as RefObject<HTMLDivElement>,
+    messagesContainerRef: messagesContainerRef as RefObject<HTMLDivElement>,
+    setShowNewMessageIndicator: setShowNewMessageIndicator,
+  })
 
   useMessageHandling({
     socket,
@@ -60,6 +59,30 @@ const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
     setShowNewMessageIndicator,
   })
 
+  useEffect(() => {
+    console.group("Online Status Debug")
+    console.log("Socket Connected:", isConnected)
+    console.log("Current Username:", username)
+    console.log("Receiver Username:", receiverUsername)
+    console.log("Online Users List:", onlineUsers)
+    console.log("Is Receiver Online:", 
+      receiverUsername 
+        ? onlineUsers.includes(receiverUsername) 
+        : "No receiver username"
+    )
+    console.log("Socket Object:", socket)
+    console.groupEnd()
+
+    if (socket && onlineUsers.length === 0) {
+      console.log("Requesting online users...")
+      socket.emit("requestOnlineUsers")
+    }
+  }, [socket, isConnected, username, receiverUsername, onlineUsers])
+
+  const isReceiverOnline = receiverUsername 
+    ? onlineUsers.includes(receiverUsername) 
+    : false
+
   const formatMessageTime = (timestamp: string) => {
     if (!timestamp) return "Unknown time"
 
@@ -69,11 +92,29 @@ const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   }
 
+  // const isReceiverOnline = receiverUsername 
+  //   ? onlineUsers.includes(receiverUsername) 
+  //   : false
+
+  // useEffect(() => {
+  //   console.log("Online Users:", onlineUsers)
+  //   console.log("Receiver Username:", receiverUsername)
+  //   console.log("Is Receiver Online:", isReceiverOnline)
+  // }, [onlineUsers, receiverUsername, isReceiverOnline])
+
   return (
     <div className="flex flex-col h-full bg-gray-800 text-white p-4 rounded-lg">
       {/* Chat Header */}
       <div className="h-12 border-b border-gray-700 mb-4 flex items-center justify-between">
-        <span className="font-medium">{receiverUsername || "Loading..."}</span>
+        <div className="flex items-center">
+          <span className="font-medium mr-2">{receiverUsername || "Loading..."}</span>
+          <span 
+            className={`h-2.5 w-2.5 rounded-full ${
+              isReceiverOnline ? 'bg-green-500' : 'bg-gray-500'
+            }`}
+            title={isReceiverOnline ? 'Online' : 'Offline'}
+          />
+        </div>
         {error && <span className="text-red-400 text-xs">{error}</span>}
       </div>
 

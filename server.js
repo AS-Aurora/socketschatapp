@@ -70,14 +70,25 @@ io.on("connection", async (socket) => {
   userSocketMap[username] = socket.id
 
   await User.findOneAndUpdate(
-      { username },
-      { isOnline: true, lastActive: new Date() }
+    { username },
+    { isOnline: true, lastActive: new Date() }
   )
 
-  socket.broadcast.emit("userStatusUpdate", { username, isOnline: true })
+  socket.broadcast.emit("userStatusUpdate", { 
+    username, 
+    isOnline: true
+  })
 
-  // Join conversation room
-  socket.on("joinConversation", async (data) => {
+  const onlineUsernames = Object.keys(userSocketMap)
+  socket.emit("initialOnlineUsers", onlineUsernames)
+
+  socket.on("requestOnlineUsers", () => {
+    const onlineUsernames = Object.keys(userSocketMap)
+    socket.emit("initialOnlineUsers", onlineUsernames)
+  })
+
+// Join conversation room
+socket.on("joinConversation", async (data) => {
       try {
           const conversationId = data.conversationId
           console.log(`User ${username} joining conversation room:`, conversationId)
@@ -223,6 +234,19 @@ socket.on("messageSent", async ({ senderId, receiverId }) => {
           console.log("WebSocket disconnected:", socket.id, `(User: ${username})`)
           delete userSocketMap[username]
 
+          await User.findOneAndUpdate(
+            { username },
+            { 
+              isOnline: false, 
+              lastActive: new Date() 
+            }
+          )
+      
+          socket.broadcast.emit("userStatusUpdate", { 
+            username, 
+            isOnline: false
+          })
+
           // Remove user from all conversation rooms
           for (const [roomId, users] of Object.entries(conversationRooms)) {
               if (users.has(username)) {
@@ -233,12 +257,7 @@ socket.on("messageSent", async ({ senderId, receiverId }) => {
               }
           }
 
-          await User.findOneAndUpdate(
-              { username },
-              { isOnline: false, lastActive: new Date() }
-          )
 
-          socket.broadcast.emit("userStatusUpdate", { username, isOnline: false })
       } catch (error) {
           console.log("Error handling disconnect:", error.message)
       }

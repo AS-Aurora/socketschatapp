@@ -128,6 +128,14 @@ const useMessageHandling = ({
     }
   }, [conversationId, socket, setMessages, messagesEndRef, isAtBottom, setShowNewMessageIndicator])
 
+  useEffect(() => {
+    if (socket) {
+      socket.on("userStatusUpdate", (data) => {
+        console.log("Status Update:", data)
+      })
+    }
+  }, [socket])
+
   return {
     isAtBottom,
   }
