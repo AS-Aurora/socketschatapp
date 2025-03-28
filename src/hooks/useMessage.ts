@@ -13,8 +13,6 @@ interface UseMessageHandlingProps {
   isLoading: boolean
   handleLoadMore: () => void
   setShowNewMessageIndicator: Dispatch<SetStateAction<boolean>>
-  setIsReceiverTyping: Dispatch<SetStateAction<boolean>>
-  setIsReceiverOnline: Dispatch<SetStateAction<boolean>>
 }
 
 const useMessageHandling = ({
@@ -28,8 +26,6 @@ const useMessageHandling = ({
   isLoading,
   handleLoadMore,
   setShowNewMessageIndicator,
-  setIsReceiverTyping,
-  setIsReceiverOnline,
 }: UseMessageHandlingProps) => {
   // Track whether user is at the bottom
   const [isAtBottom, setIsAtBottom] = useState(true)
@@ -86,27 +82,6 @@ const useMessageHandling = ({
     }
   }, [messages.length, messagesEndRef, isAtBottom])
 
-  // Handle receiver typing indicator
-  useEffect(() => {
-    if(!socket) return
-
-    const handleUserStatusUpdate = (data: { username: string; isOnline: boolean }) => {
-      setIsReceiverOnline(data.isOnline)
-    }
-
-    const handleTyping = (data: { username: string; isTyping: boolean }) => {
-      setIsReceiverTyping(data.isTyping)
-    }
-
-    socket.on("userStatusUpdate", handleUserStatusUpdate)
-    socket.on("typing", handleTyping)
-
-    return () => {
-      socket.off("userStatusUpdate", handleUserStatusUpdate)
-      socket.off("typing", handleTyping)
-    }
-  }, [socket, setIsReceiverOnline, setIsReceiverTyping])
-
   // Handle new messages from WebSocket
   useEffect(() => {
     if (!socket || !conversationId) return
@@ -152,6 +127,14 @@ const useMessageHandling = ({
       }
     }
   }, [conversationId, socket, setMessages, messagesEndRef, isAtBottom, setShowNewMessageIndicator])
+
+  useEffect(() => {
+    if (socket) {
+      socket.on("userStatusUpdate", (data) => {
+        console.log("Status Update:", data)
+      })
+    }
+  }, [socket])
 
   return {
     isAtBottom,

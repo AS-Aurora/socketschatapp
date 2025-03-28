@@ -7,19 +7,14 @@ import useFetchReceiver from "../hooks/useFetchReceiver"
 import useFetchConversation from "../hooks/useFetchConversation"
 import useSendMessage from "../hooks/useSendMessage"
 import useMessageHandling from "../hooks/useMessage"
-import useWebRTC from '../hooks/useWebRTC'
-import CallModal from '../components/CallModal'
-import { Phone, Video } from "lucide-react"
 
 const ChatArea = ({ chatId }: { chatId: string }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false)
-  const [isReceiverOnline, setIsReceiverOnline] = useState(false)
-  const [isReceiverTyping, setIsReceiverTyping] = useState(false)
 
   // Get socket connection
-  const { socket, isConnected } = useSocket()
+  const { socket, isConnected, onlineUsers } = useSocket()
 
   // Fetch current user details
   const { userId, username } = useFetchUser()
@@ -38,19 +33,18 @@ const ChatArea = ({ chatId }: { chatId: string }) => {
     handleLoadMore,
   } = useFetchConversation({ chatId })
 
-  
-const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
-  chatId,
-  conversationId,
-  receiverUsername,
-  userId,
-  username,
-  socket,
-  setMessages,
-  messagesEndRef: messagesEndRef as RefObject<HTMLDivElement>,
-  messagesContainerRef: messagesContainerRef as RefObject<HTMLDivElement>,
-  setShowNewMessageIndicator: setShowNewMessageIndicator,
-})
+  const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
+    chatId,
+    conversationId,
+    receiverUsername,
+    userId,
+    username,
+    socket,
+    setMessages,
+    messagesEndRef: messagesEndRef as RefObject<HTMLDivElement>,
+    messagesContainerRef: messagesContainerRef as RefObject<HTMLDivElement>,
+    setShowNewMessageIndicator: setShowNewMessageIndicator,
+  })
 
   useMessageHandling({
     socket,
@@ -63,41 +57,31 @@ const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
     isLoading,
     handleLoadMore,
     setShowNewMessageIndicator,
-    setIsReceiverOnline,
-    setIsReceiverTyping,
   })
 
-  const {
-    callUser,
-    answerCall,
-    endCall,
-    stream,
-    callState
-  } = useWebRTC({ socket, userId });
+  useEffect(() => {
+    console.group("Online Status Debug")
+    console.log("Socket Connected:", isConnected)
+    console.log("Current Username:", username)
+    console.log("Receiver Username:", receiverUsername)
+    console.log("Online Users List:", onlineUsers)
+    console.log("Is Receiver Online:", 
+      receiverUsername 
+        ? onlineUsers.includes(receiverUsername) 
+        : "No receiver username"
+    )
+    console.log("Socket Object:", socket)
+    console.groupEnd()
 
-  const handleStartVideoCall = () => {
-    if (receiverUsername) {
-      callUser(receiverUsername, 'video');
+    if (socket && onlineUsers.length === 0) {
+      console.log("Requesting online users...")
+      socket.emit("requestOnlineUsers")
     }
-  };
+  }, [socket, isConnected, username, receiverUsername, onlineUsers])
 
-  const handleStartAudioCall = () => {
-    if (receiverUsername) {
-      callUser(receiverUsername, 'audio');
-    }
-  }
-
-   const handleTyping = (e: FormEvent<HTMLInputElement>) => {
-    const message = (e.target as HTMLInputElement).value.trim()
-    setNewMessage(message)
-
-    if(socket && receiverUsername) {
-      socket.emit("typing", {
-        targetUsername: receiverUsername,
-        isTyping: message.length > 0,
-      })
-    }
-   }
+  const isReceiverOnline = receiverUsername 
+    ? onlineUsers.includes(receiverUsername) 
+    : false
 
   const formatMessageTime = (timestamp: string) => {
     if (!timestamp) return "Unknown time"
@@ -108,15 +92,28 @@ const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   }
 
+  // const isReceiverOnline = receiverUsername 
+  //   ? onlineUsers.includes(receiverUsername) 
+  //   : false
+
+  // useEffect(() => {
+  //   console.log("Online Users:", onlineUsers)
+  //   console.log("Receiver Username:", receiverUsername)
+  //   console.log("Is Receiver Online:", isReceiverOnline)
+  // }, [onlineUsers, receiverUsername, isReceiverOnline])
+
   return (
     <div className="flex flex-col h-full bg-gray-800 text-white p-4 rounded-lg">
       {/* Chat Header */}
       <div className="h-12 border-b border-gray-700 mb-4 flex items-center justify-between">
-        <div>
-          <span className="font-medium">{receiverUsername || "Loading..."}</span>
-          <div className="text-xs text-gray-400">
-            {isReceiverTyping ? "Typing..." : (isReceiverOnline ? "Online" : "Offline")}
-          </div>
+        <div className="flex items-center">
+          <span className="font-medium mr-2">{receiverUsername || "Loading..."}</span>
+          <span 
+            className={`h-2.5 w-2.5 rounded-full ${
+              isReceiverOnline ? 'bg-green-500' : 'bg-gray-500'
+            }`}
+            title={isReceiverOnline ? 'Online' : 'Offline'}
+          />
         </div>
         {error && <span className="text-red-400 text-xs">{error}</span>}
       </div>
@@ -198,7 +195,7 @@ const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
         <input
           type="text"
           value={newMessage}
-          onChange={handleTyping}
+          onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Type a message..."
           className="flex-1 p-2.5 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           disabled={!conversationId || isLoading}
@@ -211,22 +208,6 @@ const { newMessage, setNewMessage, handleSendMessage, error } = useSendMessage({
           Send
         </button>
       </form>
-
-      <div className="call-actions">
-        <button onClick={handleStartVideoCall}>
-          <Video /> Video Call
-        </button>
-        <button onClick={handleStartAudioCall}>
-          <Phone /> Audio Call
-        </button>
-      </div>
-
-      <CallModal 
-        callState={callState}
-        stream={stream}
-        answerCall={answerCall}
-        endCall={endCall}
-      />
     </div>
   )
 }
